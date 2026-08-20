@@ -1,7 +1,10 @@
 
 local tab = nil
 local function GetlowerModel(ent)
-    return ent:GetModel():lower() 
+    if not IsValid(ent) then return "" end
+    local model = ent:GetModel()
+    if not model or model == "" then return "" end
+    return model:lower()
 end
 local function getinittable(ent)
     local fulltbl = {}

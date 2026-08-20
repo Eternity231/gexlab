@@ -781,14 +781,17 @@ end
 
 
 local function GetlowerModel(ent)
-    return ent:GetModel():lower() 
+    if not IsValid(ent) then return "" end
+    local model = ent:GetModel()
+    if not model or model == "" then return "" end
+    return model:lower()
 end
 
 local function SaveCurrentModelSettings(ent,tbl)
     if not IsValid(ent) then return false end
     
     local model = GetlowerModel(ent)
-    if not model then return false end
+    if not model or model == "" then return false end
     LoadModelPresets()
 	if !modellist[model] then modellist[model] = {} end
     modellist[model] = tbl
