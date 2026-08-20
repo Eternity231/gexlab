@@ -1,0 +1,13 @@
+"VertexLitGeneric"
+{
+	"$basetexture" "dik/BALL"
+	//$bumpmap "tex/tacsanio/KK mag_545 8930 Sanio normal"
+	//$lightwarptexture "tex/tacsanio/basewarp"
+	$phong 1
+	$phongboost 1
+	$phongfresnelranges 1 .1 .1
+	"$halflambert" 1
+	"$nocull" 1
+	//"$nodecal" 1
+    $alphatest 1
+}
