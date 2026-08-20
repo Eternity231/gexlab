@@ -62,3 +62,11 @@ bind k "sex"
 - 手动 sex：复用 zcity 的 FakeRagdoll / RagdollDeath 作为演员尸体，不再额外创建布娃娃。
 - 修好了 EDA 死亡镜头网络消息：PlayerRag_StartDeathCam / PlayerRag_PlayerSpawn 现在会正确写入玩家实体。
 
+
+### 实用命令
+
+- searchcorpse：对准尸体/NPC 打开搜刮菜单（GexLab_menu 的别名）。
+- whipcorpse：对准尸体鞭打/砸击，物理效果 + 声音，如果 EDA 在场会触发 EDA 的高级尸体逻辑。
+- corpseinfo：打印目标尸体的 owner、模型、背包、emitter、RagdollDeath 等调试信息。
+- 调试日志：gex_debug 1 开启，gex_debug 0 关闭。
+

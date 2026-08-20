@@ -13,6 +13,13 @@ local function IsZCityActive()
 	return engine.ActiveGamemode() == "zcity" or (hg ~= nil and isfunction(hg.Ragdoll_Create))
 end
 
+local gex_debug = CreateConVar("gex_debug", 1, {FCVAR_REPLICATED, FCVAR_ARCHIVE}, "GexLab debug logging", 0, 1)
+local function GexDebug(...)
+	if gex_debug:GetBool() then
+		print("[GexLab][DEBUG]", ...)
+	end
+end
+
 local function GetZCityRagdoll(ply)
 	local rag = ply.FakeRagdoll
 	if IsValid(rag) then return rag end
@@ -1462,6 +1469,7 @@ end
 local function StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin,tries)
 	local plyrag = GetZCityRagdoll(ply)
 	if not IsValid(plyrag) then
+		GexDebug("StartZCitySex waiting for zcity ragdoll, tries=", tries or 0)
 		if (tries or 0) >= 20 then
 			if IsValid(ply) then ply:Spawn() end
 			return
@@ -1473,6 +1481,7 @@ local function StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,
 		end)
 		return
 	end
+	GexDebug("StartZCitySex using zcity ragdoll", plyrag)
 
 	local pos,facevec,sidevec,tosetang = prepnpcrag(ply, ent, up, spin, plyrag)
 	if not pos then
@@ -1878,6 +1887,58 @@ hook.Add('EntityTakeDamage','hurtfker',function(ent,dmg)
 		end
 		
 	end
+end)
+concommand.Add('corpseinfo',function(ply,cmd,args)
+	if not IsValid(ply) then return end
+	local trace = ply:GetEyeTrace()
+	local ent = trace.Entity
+	if not IsValid(ent) or (not ent:IsNPC() and not ent:IsRagdoll()) then
+		print("[GexLab] corpseinfo: no corpse in crosshair")
+		return
+	end
+	PrintTable({
+		class = ent:GetClass(),
+		model = ent:GetModel(),
+		owner = ent.owner,
+		ply = ent.ply,
+		npc = ent.npc,
+		reallykilled = ent.reallykilled,
+		Animation_State = ent:GetNWInt("Animation_State", -1),
+		FakeRagdoll = ent:GetNWEntity("FakeRagdoll"),
+		RagdollDeath = ent:GetNWEntity("RagdollDeath"),
+		emmeter = ent.emmeter,
+		inventory = ent.inventory,
+		whitelist = ent.whitelist,
+		zcity = tostring(IsZCityActive()),
+	})
+end)
+
+concommand.Add('whipcorpse',function(ply,cmd,args)
+	if not IsValid(ply) then return end
+	local trace = ply:GetEyeTrace()
+	local ent = trace.Entity
+	if not IsValid(ent) or not ent:IsRagdoll() then
+		GexDebug("whipcorpse: no corpse in crosshair")
+		return
+	end
+
+	local hitPos = trace.HitPos
+	if not hitPos or hitPos == vector_origin then hitPos = ent:GetPos() end
+
+	local phys = ent:GetPhysicsObjectNum(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Pelvis") or 0))
+	if IsValid(phys) then
+		local dir = (hitPos - ply:EyePos()):GetNormalized()
+		phys:ApplyForceOffset(dir * 3000, hitPos)
+		phys:AddAngleVelocity(VectorRand() * 80)
+		phys:Wake()
+	end
+
+	EmitSound("bodyhit/splat"..math.random(1,9)..".wav", hitPos)
+
+	if Enhanced_death_used and runallhooks then
+		runallhooks(ent)
+	end
+	print("[GexLab] Whipped corpse " .. tostring(ent) .. " at " .. tostring(hitPos))
 end)
 
 
