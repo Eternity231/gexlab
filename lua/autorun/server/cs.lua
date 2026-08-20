@@ -1888,58 +1888,7 @@ hook.Add('EntityTakeDamage','hurtfker',function(ent,dmg)
 		
 	end
 end)
-concommand.Add('corpseinfo',function(ply,cmd,args)
-	if not IsValid(ply) then return end
-	local trace = ply:GetEyeTrace()
-	local ent = trace.Entity
-	if not IsValid(ent) or (not ent:IsNPC() and not ent:IsRagdoll()) then
-		print("[GexLab] corpseinfo: no corpse in crosshair")
-		return
-	end
-	PrintTable({
-		class = ent:GetClass(),
-		model = ent:GetModel(),
-		owner = ent.owner,
-		ply = ent.ply,
-		npc = ent.npc,
-		reallykilled = ent.reallykilled,
-		Animation_State = ent:GetNWInt("Animation_State", -1),
-		FakeRagdoll = ent:GetNWEntity("FakeRagdoll"),
-		RagdollDeath = ent:GetNWEntity("RagdollDeath"),
-		emmeter = ent.emmeter,
-		inventory = ent.inventory,
-		whitelist = ent.whitelist,
-		zcity = tostring(IsZCityActive()),
-	})
-end)
 
-concommand.Add('whipcorpse',function(ply,cmd,args)
-	if not IsValid(ply) then return end
-	local trace = ply:GetEyeTrace()
-	local ent = trace.Entity
-	if not IsValid(ent) or not ent:IsRagdoll() then
-		GexDebug("whipcorpse: no corpse in crosshair")
-		return
-	end
-
-	local hitPos = trace.HitPos
-	if not hitPos or hitPos == vector_origin then hitPos = ent:GetPos() end
-
-	local phys = ent:GetPhysicsObjectNum(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Pelvis") or 0))
-	if IsValid(phys) then
-		local dir = (hitPos - ply:EyePos()):GetNormalized()
-		phys:ApplyForceOffset(dir * 3000, hitPos)
-		phys:AddAngleVelocity(VectorRand() * 80)
-		phys:Wake()
-	end
-
-	EmitSound("bodyhit/splat"..math.random(1,9)..".wav", hitPos)
-
-	if Enhanced_death_used and runallhooks then
-		runallhooks(ent)
-	end
-	print("[GexLab] Whipped corpse " .. tostring(ent) .. " at " .. tostring(hitPos))
-end)
 
 
 concommand.Add('debugsex',function(ply,cmd,args)

@@ -422,17 +422,7 @@ concommand.Add('GexLab_menu',function()
     openmenu(ent)
 end)
 
-concommand.Add('searchcorpse',function()
-    local ply = LocalPlayer()
-    local tgr = ply:GetEyeTrace()
-    local ent = tgr.Entity
-    if not IsValid(ent) or (not ent:IsNPC() and not ent:IsRagdoll()) then
-        print("[GexLab] Search corpse: no valid corpse in crosshair")
-        return
-    end
-    print("[GexLab] Searching corpse " .. tostring(ent) .. " (" .. tostring(ent:GetModel()) .. ")")
-    openmenu(ent)
-end)
+
 --[[local customMesh=nil
 net.Receive('test',function()
 
