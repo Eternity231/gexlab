@@ -758,6 +758,9 @@ local function prepnpcrag(ply,ent,up,spin,existingRag)
 		end)
 	end
 
+	if GZCompat ~= nil and GZCompat.MarkCorpse ~= nil then
+		GZCompat.MarkCorpse(plyrag, ply)
+	end
 	plyrag.AnimatedBlood_RedBlood = true
 	if GPEE and not IsValid(plyrag.emmeter) then
 		Spawnurineemter(plyrag)
@@ -1467,7 +1470,7 @@ end
 
 ----------------------------------------------------------------------
 local function StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin,tries)
-	local plyrag = GetZCityRagdoll(ply)
+	local plyrag = GZCompat.GetCorpse(ply) or GetZCityRagdoll(ply)
 	if not IsValid(plyrag) then
 		GexDebug("StartZCitySex waiting for zcity ragdoll, tries=", tries or 0)
 		if (tries or 0) >= 20 then
@@ -1626,7 +1629,7 @@ hook.Add('Think','bodyrape',function()
 	if !NPCrapeenable:GetBool() then return end
 	if CurTime() - tickover < 0.2 then return end
 	tickover = CurTime()
-	local npcs = ents.FindByClass("npc_*")
+	local npcs = GZCompat.GetCachedNPCs()
 	for k, v in ipairs( ents.FindByClass("prop_ragdoll") ) do
 		
 		if !v.tchecker then v.tchecker = CurTime() end
