@@ -8,6 +8,23 @@ local autofix = CreateConVar("gex_auto_positionfix_enable",1, {FCVAR_REPLICATED,
 local thp = CreateConVar("gex_3p_chance",50, {FCVAR_REPLICATED, FCVAR_ARCHIVE},'',0,100)
 local lootenable = CreateConVar("gex_NPClootnable",1, {FCVAR_REPLICATED, FCVAR_ARCHIVE},'',0,1)
 local gexfacenable = CreateConVar("gex_gexfacenable",1, {FCVAR_REPLICATED, FCVAR_ARCHIVE},'',0,1)
+
+local function IsZCityActive()
+	return engine.ActiveGamemode() == "zcity" or (hg ~= nil and isfunction(hg.Ragdoll_Create))
+end
+
+local function GetZCityRagdoll(ply)
+	local rag = ply.FakeRagdoll
+	if IsValid(rag) then return rag end
+	rag = ply.RagdollDeath
+	if IsValid(rag) then return rag end
+	rag = ply:GetNWEntity("RagdollDeath")
+	if IsValid(rag) then return rag end
+	rag = ply:GetNWEntity("FakeRagdoll")
+	if IsValid(rag) then return rag end
+	return nil
+end
+
 Animrag_CSC = {		
 	secondstoarrive = 0.01,
 	pos = Vector(0, 0, 0),
@@ -692,8 +709,11 @@ local function preprag(ent,pos,ang,bonetable,gender)
 	return createHrag(ent,pos,ang,bonetable)
 end 
 
-local function prepnpcrag(ply,ent,up,spin)
+local function prepnpcrag(ply,ent,up,spin,existingRag)
 	if !IsValid(ent) or !IsValid(ply) then return end
+	-- 调用方传了 existingRag 但无效时，说明 zcity 尸体还没创建好，放弃本次。
+	if existingRag ~= nil and not IsValid(existingRag) then return end
+
 	ply.onrag = ent
 	local pelvis = ent:LookupBone("ValveBiped.Bip01_Pelvis")
 	if !pelvis then return end
@@ -702,47 +722,60 @@ local function prepnpcrag(ply,ent,up,spin)
 	local sidevec = pelvisang:Forward()
 	facevec = Vector(facevec.x,facevec.y,0):GetNormalized()
 	local tosetang = facevec:Angle()
-	local npcragpos =pelvispos+facevec*(up*30)
+	local npcragpos = pelvispos+facevec*(up*30)
 	local npcragang = tosetang+Angle(up*90,180,0)+Angle(0,spin,0)
-	
 
-	local plyrag = ents.Create("prop_ragdoll")
-	plyrag:SetModel(ply:GetModel())
-	plyrag:SetPos(npcragpos)
-	plyrag:SetAngles(npcragang)
-	plyrag:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-	plyrag:SetNoDraw(true)
-	for k, v in pairs(ply:GetBodyGroups()) do
-		local current = ply:GetBodygroup(v.id)
-		plyrag:SetBodygroup(v.id,  current)
+	local plyrag = existingRag
+	if IsValid(existingRag) then
+		-- zcity 模式：复用 zcity 已经创建的 FakeRagdoll / RagdollDeath
+		existingRag:SetPos(npcragpos)
+		existingRag:SetAngles(npcragang)
+	else
+		-- 非 zcity 旧逻辑：自己创建一张演员布娃娃
+		plyrag = ents.Create("prop_ragdoll")
+		plyrag:SetModel(ply:GetModel())
+		plyrag:SetPos(npcragpos)
+		plyrag:SetAngles(npcragang)
+		plyrag:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		plyrag:SetNoDraw(true)
+		for k, v in pairs(ply:GetBodyGroups()) do
+			local current = ply:GetBodygroup(v.id)
+			plyrag:SetBodygroup(v.id,  current)
+		end
+		plyrag:Spawn()
+		plyrag:Activate()
+		plyrag:SetOwner(nil)
+		timer.Create("ragcheck"..plyrag:EntIndex(),1,0,function()
+			if plyrag.reallykilled or !IsValid(plyrag) then timer.Remove("ragcheck"..plyrag:EntIndex()) return end
+			if !IsValid(ply) then plyrag:Remove() timer.Remove("ragcheck"..plyrag:EntIndex()) return end
+		end)
 	end
-	plyrag:Spawn()
-	plyrag:Activate()
-	plyrag:SetOwner(nil)
-	timer.Create("ragcheck"..plyrag:EntIndex(),1,0,function()
-		if plyrag.reallykilled or !IsValid(plyrag) then timer.Remove("ragcheck"..plyrag:EntIndex()) return end
-		if !IsValid(ply) then plyrag:Remove() timer.Remove("ragcheck"..plyrag:EntIndex()) return end
-	end)
+
 	plyrag.AnimatedBlood_RedBlood = true
-	if GPEE then
+	if GPEE and not IsValid(plyrag.emmeter) then
 		Spawnurineemter(plyrag)
 	end
-	if ply:LookupBone('ValveBiped.Bip01_Head1') then
-		local pos1 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Head1"))
-		local pos2 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Neck1"))
-		local pos3 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Spine4"))
-		local pos4 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Spine2"))
-		local pos5 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Spine1"))
-		local pos6 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Spine"))
-		local pos7 = ply:GetBonePosition( ply:LookupBone("ValveBiped.Bip01_Pelvis"))
+
+	-- 量身高时优先用尸体骨骼；旧流程（自己建 ragdoll）才用活人骨骼量。
+	local measureEnt = IsValid(existingRag) and plyrag or ply
+	if measureEnt:LookupBone('ValveBiped.Bip01_Head1') then
+		local pos1 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Head1"))
+		local pos2 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Neck1"))
+		local pos3 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Spine4"))
+		local pos4 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Spine2"))
+		local pos5 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Spine1"))
+		local pos6 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Spine"))
+		local pos7 = measureEnt:GetBonePosition( measureEnt:LookupBone("ValveBiped.Bip01_Pelvis"))
 		local hight = (pos2-pos1):Length()+(pos3-pos2):Length()+(pos4-pos3):Length()+(pos5-pos4):Length()+(pos6-pos5):Length()+(pos7-pos6):Length()
-		--print(hight)
 		plyrag.HBHeight =hight
 	else
 		return
 	end
+
 	ply.rag = plyrag
-	ply:SetModelScale(0.2)
+	if not IsValid(existingRag) then
+		ply:SetModelScale(0.2)
+	end
 	plyrag.npc = ply
 	ent.mainrag = true
 	local tr1 = util.TraceLine( {
@@ -1426,6 +1459,60 @@ end
 
 
 ----------------------------------------------------------------------
+local function StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin,tries)
+	local plyrag = GetZCityRagdoll(ply)
+	if not IsValid(plyrag) then
+		if (tries or 0) >= 20 then
+			if IsValid(ply) then ply:Spawn() end
+			return
+		end
+		timer.Simple(0.05, function()
+			if IsValid(ply) and IsValid(ent) then
+				StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin,(tries or 0)+1)
+			end
+		end)
+		return
+	end
+
+	local pos,facevec,sidevec,tosetang = prepnpcrag(ply, ent, up, spin, plyrag)
+	if not pos then
+		-- 失败时至少让玩家恢复，避免卡在死亡状态。
+		ply.onrag = nil
+		if IsValid(ply) then ply:Spawn() end
+		return
+	end
+
+	local gHRag, sHRag
+	dg,wg,hg = dg*(ply.rag.HBHeight/27),wg*(ply.rag.HBHeight/27),hg*(ply.rag.HBHeight/27)
+
+	if Enhanced_death_used then
+		net.Start("PlayerRag_StartDeathCam")
+			net.WriteInt(ply.rag:EntIndex(), 32)
+			net.WritePlayer(ply)
+		net.Broadcast()
+	end
+
+	timer.Simple(2,function()
+		print(genderg)
+		gHRag = startanim(ply.rag,pos+hg+facevec*dg+sidevec*wg,tosetang+angg,tbg,animg,facevec,genderg)
+		sHRag = startanim(ent,pos+h+facevec*d+sidevec*w,tosetang+ang,tbs,anims,facevec,genders)
+		gHRag.oppo = sHRag
+		sHRag.oppo = gHRag
+		RunConsoleCommand('noclip')
+	end)
+
+	timer.Create("playerchecker",1,0,function()
+		if ply:Alive() then
+			if IsValid(gHRag) then
+				gHRag:Remove()
+			end
+			ply.onrag = nil
+			timer.Remove("playerchecker")
+			return
+		end
+	end)
+end
+
 concommand.Add('sex',function(ply,cmd,args)
 	if not IsValid(ply) then return end
 	local trace = ply:GetEyeTrace()
@@ -1439,6 +1526,17 @@ concommand.Add('sex',function(ply,cmd,args)
 	if IsValid(ent) and ent:IsRagdoll() and !IsValid(ply.rag) then
 		
 		local anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin = selectanim(ent,ply,1)
+
+		if IsZCityActive() then
+			-- zcity 模式：先杀掉玩家，等 zcity 生成 FakeRagdoll/RagdollDeath，
+			-- 再复用这个 zcity 尸体作为场景演员，避免额外再生成一张布娃娃。
+			ply:KillSilent()
+			ply:Spectate(OBS_MODE_ROAMING)
+			ply:SpectateEntity(NULL)
+			StartZCitySex(ply, ent, anims,tbs,d,w,h,ang,genders,animg,tbg,dg,wg,hg,angg,genderg,up,spin,0)
+			return
+		end
+
 		local pos,facevec,sidevec,tosetang = prepnpcrag(ply,ent,up,spin)
 		local gHRag,sHRag
 		dg,wg,hg = dg*(ply.rag.HBHeight/27),wg*(ply.rag.HBHeight/27),hg*(ply.rag.HBHeight/27)
@@ -1454,6 +1552,7 @@ concommand.Add('sex',function(ply,cmd,args)
 		if Enhanced_death_used then
 		net.Start("PlayerRag_StartDeathCam")
 			net.WriteInt(ply.rag:EntIndex(), 32)
+			net.WritePlayer(ply)
 		net.Broadcast()
 		end
 		
@@ -1497,6 +1596,7 @@ concommand.Add('sex',function(ply,cmd,args)
 		ply:UnSpectate()]]
 		if Enhanced_death_used then
 		net.Start("PlayerRag_PlayerSpawn")
+			net.WritePlayer(ply)
 			net.WriteBool(true)
 		net.Broadcast()
 		end
@@ -1517,10 +1617,11 @@ hook.Add('Think','bodyrape',function()
 	if !NPCrapeenable:GetBool() then return end
 	if CurTime() - tickover < 0.2 then return end
 	tickover = CurTime()
+	local npcs = ents.FindByClass("npc_*")
 	for k, v in ipairs( ents.FindByClass("prop_ragdoll") ) do
 		
 		if !v.tchecker then v.tchecker = CurTime() end
-		if !v:LookupBone("ValveBiped.Bip01_Pelvis") or !v:LookupBone("ValveBiped.Bip01_Head1") or v.raped or (Enhanced_death_used and ((!v.reallykilled))) or IsValid(v.npc) then continue end
+		if !v:LookupBone("ValveBiped.Bip01_Pelvis") or !v:LookupBone("ValveBiped.Bip01_Head1") or v.raped or (Enhanced_death_used and not IsZCityActive() and ((!v.reallykilled))) or IsValid(v.npc) then continue end
 
 		bodyfacedircheck(v)
 		
@@ -1557,7 +1658,7 @@ hook.Add('Think','bodyrape',function()
 			
 		
 		elseif (!v.HRag or #v.HRag == 0) and !IsValid(emy) then
-			for n, m in ipairs( ents.FindByClass("npc_*") ) do
+			for n, m in ipairs( npcs ) do
 
 				if IsValid(m) and m:IsNPC() and m:Alive() then 
 					
@@ -1583,7 +1684,7 @@ hook.Add('Think','bodyrape',function()
 			--print(IsValid(emy),emy:IsNPC(),emy)
 		elseif v.HRag and v.rapercount and #v.HRag < v.rapercount and !IsValid(emy) then
 			
-			for n, m in ipairs( ents.FindByClass("npc_*") ) do
+			for n, m in ipairs( npcs ) do
 				
 				if IsValid(m) and m:IsNPC() and m:Alive()  then 
 					

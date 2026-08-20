@@ -55,3 +55,10 @@ bind k "sex"
 ## 数据文件
 
 - `garrysmod/data/H_model_presets.txt`：保存各模型的面部表情与搜刮设置。
+## Z-City 适配说明
+
+- 自动检测：engine.ActiveGamemode() == "zcity" 或存在 hg.Ragdoll_Create 时启用 Z-City 适配。
+- 自动 NPC 互动：zcity 下不再要求 ragdoll 有 `reallykilled` 标记，避免与 EDA 共存时跳过所有 zcity 尸体。
+- 手动 sex：复用 zcity 的 FakeRagdoll / RagdollDeath 作为演员尸体，不再额外创建布娃娃。
+- 修好了 EDA 死亡镜头网络消息：PlayerRag_StartDeathCam / PlayerRag_PlayerSpawn 现在会正确写入玩家实体。
+

@@ -53,7 +53,9 @@ end
 
 
 local function lmp(ent)
-    local model = ent:GetModel():lower()
+	local model = ent:GetModel()
+	if not model or model == '' then return end
+	model = model:lower()
    
     if file.Exists("H_model_presets.txt", "DATA") then
         --print('preset exists')
