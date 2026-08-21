@@ -762,6 +762,9 @@ local function prepnpcrag(ply,ent,up,spin,existingRag)
 		GZCompat.MarkCorpse(plyrag, ply)
 	end
 	plyrag.AnimatedBlood_RedBlood = true
+	-- 标记该尸体已被 GexLab 使用：EDA 的主循环会跳过它，避免抢骨骼/手部动作/裙子物理。
+	plyrag.gmod_occupied = true
+	plyrag.glex_occupied = true
 	if GPEE and not IsValid(plyrag.emmeter) then
 		Spawnurineemter(plyrag)
 	end
