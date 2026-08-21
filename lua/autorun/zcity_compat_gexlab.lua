@@ -1,5 +1,5 @@
 -- ZCity compatibility shared module (GexLab edition)
--- This file is intentionally small and idempotent.
+-- This file is intentionally idempotent.
 if GZCompat == nil then GZCompat = {} end
 
 if not ConVarExists("gmod_zcity_compat_debug") then
@@ -48,4 +48,73 @@ function GZCompat.GetCachedNPCs()
         npcCacheTime = CurTime()
     end
     return npcCache
+end
+
+-- Optional: per-player custom model memory, works without editing zcity.
+if SERVER and not GZCompat._modelsLoaded then
+    GZCompat._modelsLoaded = true
+    GZCompat.savedModels = GZCompat.savedModels or {}
+    local modelsFile = "gmod_zcity_compat_models.json"
+
+    local function LoadModels()
+        local data = file.Read(modelsFile, "DATA")
+        if data then
+            GZCompat.savedModels = util.JSONToTable(data) or {}
+        end
+    end
+    local function SaveModels()
+        file.Write(modelsFile, util.TableToJSON(GZCompat.savedModels, true))
+    end
+    LoadModels()
+
+    function GZCompat.SetCustomModel(ply, mdl)
+        if not IsValid(ply) or not isstring(mdl) then return false end
+        GZCompat.savedModels[ply:SteamID64()] = mdl
+        SaveModels()
+        return true
+    end
+
+    function GZCompat.ResetCustomModel(ply)
+        if not IsValid(ply) then return end
+        GZCompat.savedModels[ply:SteamID64()] = nil
+        SaveModels()
+    end
+
+    hook.Add("PlayerSpawn", "GZCompat_ReapplyModel", function(ply)
+        if not IsValid(ply) then return end
+        local mdl = GZCompat.savedModels[ply:SteamID64()]
+        if not mdl or mdl == ply:GetModel() then return end
+
+        -- 等一帧，让 zcity 自己的 ApplyAppearance 先执行，再覆盖成自定义模型
+        timer.Simple(0, function()
+            if IsValid(ply) and GZCompat.savedModels[ply:SteamID64()] == mdl and ply:GetModel() ~= mdl then
+                ply:SetModel(mdl)
+                GZCompat.Debug("Reapplied custom model to", ply, mdl)
+            end
+        end)
+    end)
+
+    concommand.Add("gmod_setplayermodel", function(ply, cmd, args)
+        if not IsValid(ply) then return end
+        local mdl = args[1]
+        if not mdl or not string.StartWith(mdl, "models/") or not string.EndsWith(mdl, ".mdl") then
+            ply:ChatPrint("[GZCompat] 用法: gmod_setplayermodel models/xxx/xxx.mdl")
+            return
+        end
+        if not util.IsValidModel(mdl) then
+            ply:ChatPrint("[GZCompat] 模型不存在或未加载: " .. mdl)
+            return
+        end
+        util.PrecacheModel(mdl)
+        if GZCompat.SetCustomModel(ply, mdl) then
+            ply:SetModel(mdl)
+            ply:ChatPrint("[GZCompat] 已保存自定义模型: " .. mdl)
+        end
+    end)
+
+    concommand.Add("gmod_resetplayermodel", function(ply)
+        if not IsValid(ply) then return end
+        GZCompat.ResetCustomModel(ply)
+        ply:ChatPrint("[GZCompat] 已清除自定义模型，下次重生用 zcity 默认外观")
+    end)
 end
