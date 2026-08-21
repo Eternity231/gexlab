@@ -1674,7 +1674,7 @@ hook.Add('Think','bodyrape',function()
 
 				if IsValid(m) and m:IsNPC() and m:Alive() then 
 					
-					if (!Enhanced_death_used and m:GetClass()=="npc_citizen")  or IsValid(m.rag) or IsValid(m.target) or m.cantrape==v or (modellist and modellist[GetlowerModel(m)] and modellist[GetlowerModel(m)]['banned']) or (v.isplayerside and m:Disposition(ply) == D_LI) or (!v.isplayerside and m:Disposition(ply) == D_HT) then  continue end
+					if (!Enhanced_death_used and m:GetClass()=="npc_citizen")  or IsValid(m.rag) or IsValid(m.target) or m.cantrape==v or (modellist and modellist[GetlowerModel(m)] and modellist[GetlowerModel(m)]['banned']) or (IsValid(ply) and v.isplayerside and m:Disposition(ply) == D_LI) or (IsValid(ply) and !v.isplayerside and m:Disposition(ply) == D_HT) then  continue end
 					if IsValid(m.fktg) then 
 						
 						if m.fktg.raped then
@@ -1700,7 +1700,7 @@ hook.Add('Think','bodyrape',function()
 				
 				if IsValid(m) and m:IsNPC() and m:Alive()  then 
 					
-					if (!Enhanced_death_used and m:GetClass()=="npc_citizen") or  m.fkedtg == v or IsValid(m.rag) or IsValid(m.target) or m.cantrape==v or (modellist and modellist[GetlowerModel(m)] and modellist[GetlowerModel(m)]['banned']) or (v.isplayerside and m:Disposition(ply) == D_LI) or (!v.isplayerside and m:Disposition(ply) == D_HT) then continue end
+					if (!Enhanced_death_used and m:GetClass()=="npc_citizen") or  m.fkedtg == v or IsValid(m.rag) or IsValid(m.target) or m.cantrape==v or (modellist and modellist[GetlowerModel(m)] and modellist[GetlowerModel(m)]['banned']) or (IsValid(ply) and v.isplayerside and m:Disposition(ply) == D_LI) or (IsValid(ply) and !v.isplayerside and m:Disposition(ply) == D_HT) then continue end
 					if IsValid(m.fktg) then 
 						if m.fktg.raped then
 							m.fktg=nil
