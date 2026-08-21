@@ -10,7 +10,7 @@ local lootenable = CreateConVar("gex_NPClootnable",1, {FCVAR_REPLICATED, FCVAR_A
 local gexfacenable = CreateConVar("gex_gexfacenable",1, {FCVAR_REPLICATED, FCVAR_ARCHIVE},'',0,1)
 
 local function IsZCityActive()
-	return engine.ActiveGamemode() == "zcity" or (hg ~= nil and isfunction(hg.Ragdoll_Create))
+	return GZCompat ~= nil and GZCompat.IsActive ~= nil and GZCompat.IsActive()
 end
 
 local gex_debug = CreateConVar("gex_debug", 1, {FCVAR_REPLICATED, FCVAR_ARCHIVE}, "GexLab debug logging", 0, 1)
@@ -21,14 +21,9 @@ local function GexDebug(...)
 end
 
 local function GetZCityRagdoll(ply)
-	local rag = ply.FakeRagdoll
-	if IsValid(rag) then return rag end
-	rag = ply.RagdollDeath
-	if IsValid(rag) then return rag end
-	rag = ply:GetNWEntity("RagdollDeath")
-	if IsValid(rag) then return rag end
-	rag = ply:GetNWEntity("FakeRagdoll")
-	if IsValid(rag) then return rag end
+	if GZCompat ~= nil and GZCompat.GetCorpse ~= nil then
+		return GZCompat.GetCorpse(ply)
+	end
 	return nil
 end
 
@@ -743,7 +738,11 @@ local function prepnpcrag(ply,ent,up,spin,existingRag)
 		plyrag:SetModel(ply:GetModel())
 		plyrag:SetPos(npcragpos)
 		plyrag:SetAngles(npcragang)
-		plyrag:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		if GZCompat ~= nil and GZCompat.ApplyRagdollSettings ~= nil then
+			GZCompat.ApplyRagdollSettings(plyrag, { collision_group = COLLISION_GROUP_DEBRIS })
+		else
+			plyrag:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		end
 		plyrag:SetNoDraw(true)
 		for k, v in pairs(ply:GetBodyGroups()) do
 			local current = ply:GetBodygroup(v.id)
@@ -762,9 +761,11 @@ local function prepnpcrag(ply,ent,up,spin,existingRag)
 		GZCompat.MarkCorpse(plyrag, ply)
 	end
 	plyrag.AnimatedBlood_RedBlood = true
-	-- 标记该尸体已被 GexLab 使用：EDA 的主循环会跳过它，避免抢骨骼/手部动作/裙子物理。
-	plyrag.gmod_occupied = true
-	plyrag.glex_occupied = true
+	-- 标记该尸体已被 GexLab 使用：只在 zcity 适配启用时通知 EDA 跳过，
+	-- 避免抢骨骼/手部动作/裙子物理。
+	if IsZCityActive() and GZCompat ~= nil and GZCompat.ClaimRagdoll ~= nil then
+		GZCompat.ClaimRagdoll(plyrag, ply, "gexlab")
+	end
 	if GPEE and not IsValid(plyrag.emmeter) then
 		Spawnurineemter(plyrag)
 	end
